@@ -10,10 +10,10 @@ struct Args {
     path: String,
     
     #[arg(short='u', long, help="name of user, as string")]
-    uid: String,
+    user: String,
 
     #[arg(short='g', long, help="name of group, as string")]
-    gid: u32,
+    group: String,
 
     #[arg(short='f', long, help="File permissions, in octal")]
     file_permissions: String,
@@ -36,7 +36,7 @@ impl From<std::io::Error> for ParserError {
 
 fn parse_etc_file(path: &str) -> Result<HashMap<String, u32>, ParserError> {
     fs::read_to_string(path)?
-        .split('\n')
+        .lines()
         .filter(|line| !line.is_empty())
         .map(|line| {
             let line = line.to_owned();
@@ -55,8 +55,25 @@ fn parse_etc_file(path: &str) -> Result<HashMap<String, u32>, ParserError> {
         .collect()
 }
 
+#[cfg(debug_assertions)]
+const PASSWD_PATH: &str = "passwd";
+#[cfg(not(debug_assertions))]
+const PASSWD_PATH: &str = "/etc/passwd";
+#[cfg(debug_assertions)]
+const GROUP_PATH: &str = "group";
+#[cfg(not(debug_assertions))]
+const GROUP_PATH: &str = "/etc/group";
+
 fn main() {
-    //let args = Args::parse();
+    let args = Args::parse();
     
-    dbg!(parse_etc_file("passwd"));
+    let users = parse_etc_file(PASSWD_PATH)
+        .expect("failed to parse passwd file");
+    let groups = parse_etc_file(GROUP_PATH)
+        .expect("failed to parse group file");
+
+    let uid = users.get(&args.user).expect("user not found");
+    let gid = groups.get(&args.group).expect("group not found");
+
+    dbg!(uid, gid);
 }
