@@ -1,4 +1,7 @@
 use clap::Parser;
+use std::fs;
+use std::collections::HashMap;
+use std::num::ParseIntError;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -19,7 +22,41 @@ struct Args {
     directory_permissions: String
 }
 
+#[derive(Debug)]
+enum ParserError {
+    FileError(std::io::Error),
+    UserIdError(String, ParseIntError)
+}
+
+impl From<std::io::Error> for ParserError {
+    fn from(value: std::io::Error) -> Self {
+        Self::FileError(value)
+    }
+}
+
+fn parse_etc_file(path: &str) -> Result<HashMap<String, u32>, ParserError> {
+    fs::read_to_string(path)?
+        .split('\n')
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            let line = line.to_owned();
+            let values = line
+                .split(':')
+                .collect::<Vec<&str>>();
+            
+            let name = values[0].to_owned();
+            let id: u32 = match str::parse(values[2]) {
+                Ok(id) => id,
+                Err(e) => return Err(ParserError::UserIdError(name, e))
+            };
+
+            Ok((name, id))
+        })
+        .collect()
+}
+
 fn main() {
-    let args = Args::parse();
-    dbg!(args);
+    //let args = Args::parse();
+    
+    dbg!(parse_etc_file("passwd"));
 }
