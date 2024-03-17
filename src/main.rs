@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::fs::{self, DirEntry, FileType, ReadDir};
+use std::fs::{self, DirEntry};
 use std::collections::HashMap;
 use std::num::ParseIntError;
 use std::path::Path;
@@ -132,5 +132,25 @@ fn main() {
     let uid = users.get(&args.user).expect("user not found");
     let gid = groups.get(&args.group).expect("group not found");
 
-    dbg!(traverse_filesystem(Path::new(&args.path)));
+    let file_permissions = u32::from_str_radix(args.file_permissions.as_str(), 8)
+        .expect("file permissions must be an octal number");
+    let directory_permissions = u32::from_str_radix(args.directory_permissions.as_str(), 8)
+        .expect("directory permissions must be an octal number");
+    if file_permissions > 511 || directory_permissions > 511 {
+        eprintln!("permissions number is greater than 777");
+        return;
+    }
+
+    dbg!(file_permissions, directory_permissions);
+
+    let (files, directories) = traverse_filesystem(Path::new(&args.path));
+    for file in files {
+        // do the file permissions
+    }
+
+    for directory in directories {
+        // do the directory permissions
+    }
+
+    println!("All done!")
 }
