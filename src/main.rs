@@ -1,6 +1,6 @@
 use clap::Parser;
 use std::fs;
-use std::fs::{File, DirEntry};
+use std::fs::DirEntry;
 use std::collections::HashMap;
 use std::num::ParseIntError;
 use std::path::Path;
@@ -115,11 +115,7 @@ fn traverse_filesystem(path: &Path) -> (Vec<String>, Vec<String>){
 }
 
 fn set_permissions(path: &str, mode: u32) -> Result<(), std::io::Error> {
-    let file = File::create(path)?;
-    let metadata = file.metadata()?;
-    let mut permissions = metadata.permissions();
-
-    permissions.set_mode(mode);
+    fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
     Ok(())
 }
 
