@@ -1,8 +1,10 @@
 use clap::Parser;
-use std::fs::{self, DirEntry};
+use std::fs;
+use std::fs::{File, DirEntry};
 use std::collections::HashMap;
 use std::num::ParseIntError;
 use std::path::Path;
+use std::os::unix::fs::{chown, PermissionsExt};
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -55,15 +57,6 @@ fn parse_etc_file(path: &str) -> Result<HashMap<String, u32>, ParserError> {
         })
         .collect()
 }
-
-#[cfg(debug_assertions)]
-const PASSWD_PATH: &str = "passwd";
-#[cfg(not(debug_assertions))]
-const PASSWD_PATH: &str = "/etc/passwd";
-#[cfg(debug_assertions)]
-const GROUP_PATH: &str = "group";
-#[cfg(not(debug_assertions))]
-const GROUP_PATH: &str = "/etc/group";
 
 fn traverse_filesystem(path: &Path) -> (Vec<String>, Vec<String>){
     let mut files: Vec<String> = Vec::new();
@@ -121,16 +114,25 @@ fn traverse_filesystem(path: &Path) -> (Vec<String>, Vec<String>){
     (files, directories)
 }
 
+fn set_permissions(path: &str, mode: u32) -> Result<(), std::io::Error> {
+    let file = File::create(path)?;
+    let metadata = file.metadata()?;
+    let mut permissions = metadata.permissions();
+
+    permissions.set_mode(mode);
+    Ok(())
+}
+
 fn main() {
     let args = Args::parse();
     
-    let users = parse_etc_file(PASSWD_PATH)
+    let users = parse_etc_file("/etc/passwd")
         .expect("failed to parse passwd file");
-    let groups = parse_etc_file(GROUP_PATH)
+    let groups = parse_etc_file("/etc/group")
         .expect("failed to parse group file");
 
-    let uid = users.get(&args.user).expect("user not found");
-    let gid = groups.get(&args.group).expect("group not found");
+    let uid = *users.get(&args.user).expect("user not found");
+    let gid = *groups.get(&args.group).expect("group not found");
 
     let file_permissions = u32::from_str_radix(args.file_permissions.as_str(), 8)
         .expect("file permissions must be an octal number");
@@ -141,15 +143,23 @@ fn main() {
         return;
     }
 
-    dbg!(file_permissions, directory_permissions);
-
     let (files, directories) = traverse_filesystem(Path::new(&args.path));
-    for file in files {
-        // do the file permissions
+    for file in &files {
+        if let Err(e) = set_permissions(&file, file_permissions) {
+            eprintln!("failed to set {file} permissions: {e}");
+        }
+        if let Err(e) = chown(file, Some(uid), Some(gid)) {
+            eprintln!("failed to set {file} ownership: {e}");
+        }
     }
 
-    for directory in directories {
-        // do the directory permissions
+    for directory in &directories {
+        if let Err(e) = set_permissions(&directory, directory_permissions) {
+            eprintln!("failed to set {directory} permissions: {e}");
+        }
+        if let Err(e) = chown(directory, Some(uid), Some(gid)) {
+            eprintln!("failed to set {directory} ownership: {e}");
+        }
     }
 
     println!("All done!")
