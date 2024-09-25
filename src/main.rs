@@ -134,10 +134,6 @@ fn main() {
         .expect("file permissions must be an octal number");
     let directory_permissions = u32::from_str_radix(args.directory_permissions.as_str(), 8)
         .expect("directory permissions must be an octal number");
-    if file_permissions > 511 || directory_permissions > 511 {
-        eprintln!("permissions number is greater than 777");
-        return;
-    }
 
     let (files, directories) = traverse_filesystem(Path::new(&args.path));
     for file in &files {
